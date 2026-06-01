@@ -472,13 +472,10 @@
 <script>
 function flexUnified() {
     return {
-        // --- NEW: CONFIGURATION ---
-        // This automatically picks the right URL. 
-        // If the website address is 'localhost', it uses your local server. 
-        // Otherwise, it uses your Render server.
+        // --- UPDATED URL WITH -1 ---
         apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
                     ? 'http://localhost:3000' 
-                    : 'https://flexvapeshop-db.onrender.com',
+                    : 'https://flexvapeshop-db-1.onrender.com',
 
         systemName: localStorage.getItem('flex_system_name') || 'F.L.E.X',
         isLoggedIn: localStorage.getItem('flex_logged_in') === 'true',
@@ -506,10 +503,14 @@ function flexUnified() {
 
         async fetchData() {
             try {
+                console.log("Fetching from:", `${this.apiBaseUrl}/api/products/${this.currentBranchId}`);
                 const pRes = await fetch(`${this.apiBaseUrl}/api/products/${this.currentBranchId}`);
+                if (!pRes.ok) throw new Error("Backend error");
                 this.products = await pRes.json();
+                
                 const sRes = await fetch(`${this.apiBaseUrl}/api/reports/${this.currentBranchId}`);
                 this.sales = await sRes.json();
+                
                 this.dbOnline = true;
                 localStorage.setItem('flex_branch_id', this.currentBranchId);
             } catch (e) { 
@@ -548,7 +549,6 @@ function flexUnified() {
                     const diff = today - saleDate;
                     if (diff <= (7 * 24 * 60 * 60 * 1000)) match = true;
                 }
-
                 if(match) total += parseFloat(s.total_amount);
             });
             return total.toLocaleString(undefined, {minimumFractionDigits: 2});
@@ -558,21 +558,19 @@ function flexUnified() {
         cartTotalRaw() { return this.cart.reduce((s, i) => s + (i.price * i.qty), 0); },
         cartTotal() { return this.cartTotalRaw().toLocaleString(undefined, {minimumFractionDigits: 2}); },
         calculateChange() { return this.cashReceived - this.cartTotalRaw(); },
-        addToCart(p) { const exist = this.cart.find(x => x.sku === p.sku); if(exist) exist.qty++; else this.cart.push({...p, qty: 1}); },
+        addToCart(p) { 
+            if(p.stock <= 0) { alert("Out of stock!"); return; }
+            const exist = this.cart.find(x => x.sku === p.sku); 
+            if(exist) exist.qty++; else this.cart.push({...p, qty: 1}); 
+        },
         get filteredProducts() { 
             const term = this.search.toLowerCase();
             return this.products.filter(p => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)); 
-        },
-        editCartItemPrice(idx) {
-            const item = this.cart[idx];
-            const newPrice = prompt(`Enter Discounted/New Price for ${item.name}:`, item.price);
-            if (newPrice !== null && !isNaN(newPrice)) this.cart[idx].price = parseFloat(newPrice);
         },
         getBranchName(id) { return this.branches.find(b => b.id == id)?.name || "Station"; },
         logout() { localStorage.clear(); window.location.reload(); },
 
         async handleLogin() {
-            // Check for Hardcoded Admin Bypass
             if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
                 this.isLoggedIn = true;
                 this.role = 'owner';
@@ -586,11 +584,7 @@ function flexUnified() {
             try {
                 const res = await fetch(`${this.apiBaseUrl}/api/login`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        username: this.loginUsername, 
-                        password: this.loginPassword, 
-                        branchId: this.currentBranchId 
-                    })
+                    body: JSON.stringify({ username: this.loginUsername, password: this.loginPassword, branchId: this.currentBranchId })
                 });
                 const data = await res.json();
                 if (data.success) { 
@@ -601,15 +595,18 @@ function flexUnified() {
                     localStorage.setItem('flex_branch_id', this.currentBranchId);
                     this.fetchData(); 
                 } else alert("Access Denied: Invalid Credentials");
-            } catch (e) { alert("Server connection failed. The server may be waking up, please try again in 30 seconds."); }
+            } catch (e) { alert("Server is waking up. Please wait 30 seconds and try again."); }
         },
 
         async checkout() {
-            const res = await fetch(`${this.apiBaseUrl}/api/checkout`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ branchId: this.currentBranchId, cart: this.cart, total: this.cartTotalRaw() })
-            });
-            if (res.ok) { this.cart = []; this.cashReceived = 0; this.fetchData(); alert("✅ SALE SUCCESSFUL"); }
+            if(this.cart.length === 0) return;
+            try {
+                const res = await fetch(`${this.apiBaseUrl}/api/checkout`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ branchId: this.currentBranchId, cart: this.cart, total: this.cartTotalRaw() })
+                });
+                if (res.ok) { this.cart = []; this.cashReceived = 0; this.fetchData(); alert("✅ SALE SUCCESSFUL"); }
+            } catch (e) { alert("Checkout failed."); }
         },
 
         async restock(product) {
@@ -618,17 +615,6 @@ function flexUnified() {
                 await fetch(`${this.apiBaseUrl}/api/restock`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ sku: product.sku, branchId: this.currentBranchId, amount: parseInt(amount) })
-                });
-                this.fetchData();
-            }
-        },
-
-        async editPrice(product) {
-            const newPrice = prompt(`Update Master Price for ${product.name}:`, product.price);
-            if (newPrice && !isNaN(newPrice)) {
-                await fetch(`${this.apiBaseUrl}/api/update-price`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ sku: product.sku, branchId: this.currentBranchId, price: parseFloat(newPrice) })
                 });
                 this.fetchData();
             }
