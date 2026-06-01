@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en" x-data="flexUnified()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title x-text="systemName + ' | Analytics Dashboard'"></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Oswald:wght@500;700&display=swap');
+        
+        :root { --flex-navy: #1B3041; --flex-indigo: #6366f1; --flex-dark: #0f172a; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; color: #0f172a; overflow: hidden; }
+        .headline-font { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .sidebar-gradient { background: linear-gradient(180deg, #1B3041 0%, #0f172a 100%); }
+        .pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+        .nav-link { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 9999px !important; margin: 0 10px; width: auto !important; }
+        .nav-active { background: rgba(255,255,255,0.1) !important; color: white !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
+        button, .btn-pill { border-radius: 9999px !important; }
+        .login-dots { background-color: #020617; background-image: radial-gradient(rgba(255,255,255,0.1) 1px, transparent 0); background-size: 30px 30px; }
+        [x-cloak] { display: none !important; }
+
+        @media print {
+            aside, header, .no-print, button, input, textarea, select { display: none !important; }
+            body { background: white !important; overflow: visible !important; }
+            main { display: block !important; overflow: visible !important; }
+            .print-area { display: block !important; width: 100% !important; padding: 0 !important; }
+            .printable-card { border: none !important; box-shadow: none !important; }
+        }
+    </style>
+</head>
+<body class="antialiased text-slate-900">
+
+    <!-- INTEGRATED LOGIN GATEKEEPER -->
+    <div x-show="!isLoggedIn" class="fixed inset-0 z-[200] flex items-center justify-center login-dots" x-cloak>
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
+            <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
+        </div>
+        <div class="relative w-full max-w-[450px] p-6 text-center">
+            <img src="logo.jpg" class="w-32 h-32 mx-auto mb-6 rounded-full border-4 border-white/10 shadow-2xl" alt="FLEX LOGO">
+            
+            <div class="bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+                <h2 class="headline-font text-2xl text-white mb-2 italic">System Access</h2>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-8">Secure Terminal Login</p>
+                
+                <div class="space-y-4">
+                    <div class="text-left px-2">
+                        <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1 block ml-4">Authorized Station</label>
+                        <select x-model.number="currentBranchId" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none cursor-pointer focus:border-indigo-500 transition-all">
+                            <template x-for="branch in branches" :key="branch.id">
+                                <option :value="branch.id" x-text="branch.name" class="bg-slate-900 text-white"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <input type="text" x-model="loginUsername" placeholder="Username" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none focus:border-indigo-500 transition-all">
+                        <input type="password" x-model="loginPassword" placeholder="Password" @keyup.enter="handleLogin()" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none focus:border-indigo-500 transition-all">
+                    </div>
+
+                    <button @click="handleLogin()" class="w-full bg-indigo-600 text-white py-5 mt-4 rounded-full headline-font text-xl tracking-widest hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95">
+                        Verify Identity
+                    </button>
+                    
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tighter mt-4 italic">Encrypted Database Link Active</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP STRUCTURE -->
+    <div x-show="isLoggedIn" class="flex h-screen w-full overflow-hidden" x-cloak>
+        <aside class="w-64 sidebar-gradient text-white flex flex-col z-50 no-print">
+            <div class="p-8 text-center">
+                <img src="logo.jpg" class="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-white/10" alt="LOGO">
+                <h1 class="headline-font text-3xl font-black italic tracking-tighter" x-text="systemName"></h1>
+                <p class="text-[10px] font-bold uppercase text-indigo-300" x-text="getBranchName(currentBranchId)"></p>
+            </div>
+
+            <!-- Management View Dropdown (Only for Owners) -->
+            <div x-show="role === 'owner'" class="px-6 pb-4 no-print">
+                <div class="bg-white/5 border border-white/10 p-3 rounded-2xl">
+                    <label class="text-[8px] font-black text-indigo-300 uppercase mb-1 block">Management View</label>
+                    <select x-model.number="currentBranchId" @change="fetchData()" class="w-full bg-slate-900 border-none rounded-lg py-1 px-2 text-[10px] font-bold text-white outline-none cursor-pointer">
+                        <template x-for="branch in branches" :key="branch.id">
+                            <option :value="branch.id" x-text="branch.name"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+            
+            <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+                <button @click="view = 'dashboard'" :class="view === 'dashboard' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-chart-pie"></i> Dashboard
+                </button>
+                <button @click="view = 'analytics'" :class="view === 'analytics' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-chart-line"></i> Analytics
+                </button>
+                <button @click="view = 'catalog'" :class="view === 'catalog' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-book-open"></i> Catalog
+                </button>
+                <button @click="view = 'purchase_report'" :class="view === 'purchase_report' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-list-ul"></i> Purchase Logs
+                </button>
+                <button x-show="role !== 'owner'" @click="view = 'pos'" :class="view === 'pos' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-cash-register"></i> POS Counter
+                </button>
+                <button @click="view = 'inventory'" :class="view === 'inventory' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-boxes-stacked"></i> Inventory
+                </button>
+                <button @click="view = 'reports'" :class="view === 'reports' ? 'nav-active' : 'text-slate-400 hover:bg-white/5'" class="nav-link w-full flex items-center gap-4 p-4 rounded-2xl font-bold text-xs uppercase italic">
+                    <i class="fa-solid fa-receipt"></i> Sales Audit
+                </button>
+            </nav>
+            <div class="p-6 border-t border-white/5">
+                <button @click="logout()" class="w-full py-4 bg-red-500/10 text-red-500 hover:bg-red-500 rounded-full font-black text-[10px] uppercase transition-all">Lock Terminal</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
+            <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0 no-print">
+                <h2 class="headline-font text-xl font-black text-slate-900" x-text="view.replace('_', ' ')"></h2>
+                <div class="flex items-center gap-4">
+                    <div :class="dbOnline ? 'bg-emerald-500' : 'bg-red-500'" class="w-2 h-2 rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-black uppercase text-slate-400" x-text="dbOnline ? 'Securely Linked' : 'Offline Mode'"></span>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-hidden print-area">
+                
+                <!-- 1. DASHBOARD VIEW -->
+                <div x-show="view === 'dashboard'" class="h-full p-8 overflow-y-auto space-y-8 no-print bg-[#f8fafc]" x-cloak>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-4xl font-extrabold text-slate-800 flex items-center gap-3">
+                                <span class="text-indigo-600"><i class="fa-solid fa-circle-nodes"></i></span> Dashboard
+                            </h1>
+                            <p class="text-slate-500 font-medium mt-1" x-text="getGreeting() + ' — here\'s your store overview'"></p>
+                        </div>
+                        <button @click="view = 'reports'" class="bg-[#9474bc] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-sm transition-all">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Business History
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <button @click="view = 'catalog'" class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-left hover:shadow-md transition-all group">
+                            <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center mb-4 text-xl group-hover:scale-110 transition-transform"><i class="fa-solid fa-boxes-stacked"></i></div>
+                            <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Current Stock</p>
+                            <h3 class="text-4xl font-black text-slate-800 my-1" x-text="products.reduce((a,b) => a + (b.stock || 0), 0)"></h3>
+                            <p class="text-xs text-slate-400 font-medium">Total units in inventory</p>
+                        </button>
+                        <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                            <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center mb-4 text-xl"><i class="fa-solid fa-cart-shopping"></i></div>
+                            <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Sales Today</p>
+                            <h3 class="text-4xl font-black text-slate-800 my-1" x-text="getSalesCount('day')"></h3>
+                            <p class="text-xs text-slate-400 font-medium">Transactions recorded today</p>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                            <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-4 text-xl"><i class="fa-solid fa-peseta-sign"></i></div>
+                            <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Revenue Today</p>
+                            <h3 class="text-4xl font-black text-slate-800 my-1" x-text="'₱' + calculateRevenue('day')"></h3>
+                            <p class="text-xs text-slate-400 font-medium">Monthly earnings so far</p>
+                        </div>
+                        <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                            <div class="w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center mb-4 text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Low Stock Items</p>
+                            <h3 class="text-4xl font-black text-red-500 my-1" x-text="getLowStockItems().length"></h3>
+                            <p class="text-xs text-slate-400 font-medium">Products below 10 units</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+                            <div class="flex items-center gap-4 mb-8">
+                                <div class="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-indigo-100"><i class="fa-solid fa-bolt"></i></div>
+                                <div><h3 class="text-xl font-black text-slate-800">Quick Actions</h3><p class="text-sm text-slate-400 font-medium">Jump to any section</p></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button @click="view = 'catalog'" class="flex items-center gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-md transition-all text-left">
+                                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-book-open"></i></div>
+                                    <div><p class="font-bold text-slate-800 text-sm">Catalog</p><p class="text-[10px] text-slate-400 uppercase font-bold">Visual list</p></div>
+                                </button>
+                                <button @click="view = 'purchase_report'" class="flex items-center gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-md transition-all text-left">
+                                    <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                                    <div><p class="font-bold text-slate-800 text-sm">Purchase Logs</p><p class="text-[10px] text-slate-400 uppercase font-bold">Item details</p></div>
+                                </button>
+                                <button @click="view = 'analytics'" class="flex items-center gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-md transition-all text-left">
+                                    <div class="w-10 h-10 bg-pink-100 text-pink-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-chart-line"></i></div>
+                                    <div><p class="font-bold text-slate-800 text-sm">Analytics</p><p class="text-[10px] text-slate-400 uppercase font-bold">Insights</p></div>
+                                </button>
+                                <button @click="view = 'reports'" class="flex items-center gap-4 p-5 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-md transition-all text-left">
+                                    <div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><i class="fa-solid fa-file-invoice"></i></div>
+                                    <div><p class="font-bold text-slate-800 text-sm">Reports</p><p class="text-[10px] text-slate-400 uppercase font-bold">Audits</p></div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col">
+                            <div class="flex items-center gap-4 mb-8">
+                                <div class="w-12 h-12 bg-red-50 text-white rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-red-100"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                                <div><h3 class="text-xl font-black text-slate-800">Low Stock Alert</h3><p class="text-sm text-slate-400 font-medium">Items below 10 units</p></div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto">
+                                <table class="w-full text-left">
+                                    <thead><tr class="text-[11px] font-black uppercase text-slate-400 border-b border-slate-50"><th class="pb-4">Product</th><th class="pb-4 text-center">Qty</th><th class="pb-4 text-right">Status</th></tr></thead>
+                                    <tbody class="divide-y divide-slate-50">
+                                        <template x-for="p in getLowStockItems()" :key="p.sku">
+                                            <tr>
+                                                <td class="py-4 font-bold text-slate-700 text-sm" x-text="p.name"></td>
+                                                <td class="py-4 text-center font-black text-red-500" x-text="p.stock"></td>
+                                                <td class="py-4 text-right"><span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Critical Low</span></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ANALYTICS VIEW -->
+                <div x-show="view === 'analytics'" class="h-full p-8 overflow-y-auto space-y-8 bg-slate-50" x-cloak>
+                    <div class="max-w-7xl mx-auto space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-[#1B3041] text-white p-8 rounded-[2.5rem] shadow-xl">
+                                <p class="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-2">Weekly Gross Profit</p>
+                                <h3 class="text-4xl font-black" x-text="'₱' + calculateRevenue('weekly')"></h3>
+                                <div class="mt-4 flex items-center gap-2 text-emerald-400 text-xs font-bold"><i class="fa-solid fa-arrow-up"></i> +14.2% Growth</div>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Avg Transaction Value</p>
+                                <h3 class="text-4xl font-black text-slate-800" x-text="'₱' + (getSalesCount('day') > 0 ? (parseFloat(calculateRevenue('day').replace(/,/g,'')) / getSalesCount('day')).toFixed(2) : '0.00')"></h3>
+                                <p class="mt-4 text-slate-400 text-xs font-bold uppercase tracking-tighter">Performance</p>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Inventory Assets</p>
+                                <h3 class="text-4xl font-black text-slate-800" x-text="'₱' + products.reduce((a,b) => a + (b.price * b.stock), 0).toLocaleString()"></h3>
+                                <p class="mt-4 text-slate-400 text-xs font-bold uppercase tracking-tighter">Stock Value</p>
+                            </div>
+                        </div>
+                        <div class="bg-white p-10 rounded-[3rem] shadow-sm border">
+                            <h3 class="headline-font text-2xl font-black mb-8 italic text-slate-800 text-center">Top Performing Flavors</h3>
+                            <div class="space-y-6 max-w-4xl mx-auto">
+                                <template x-for="(p, idx) in products.sort((a,b) => b.stock - a.stock).slice(0, 5)" :key="p.sku">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-500" x-text="idx + 1"></div>
+                                        <div class="flex-1">
+                                            <div class="flex justify-between mb-2 text-sm"><span class="font-bold text-slate-800" x-text="p.name"></span><span class="font-black text-indigo-600" x-text="'₱' + (p.price * (idx + 5)).toLocaleString()"></span></div>
+                                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div class="bg-indigo-500 h-full rounded-full transition-all" :style="'width: ' + (100 - (idx * 15)) + '%'"></div></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. PURCHASE REPORT VIEW -->
+                <div x-show="view === 'purchase_report'" class="h-full p-8 overflow-y-auto space-y-8 bg-slate-50" x-cloak>
+                    <div class="max-w-7xl mx-auto">
+                        <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                            <div class="bg-[#1B3041] p-8 text-white flex justify-between items-center">
+                                <div><h3 class="headline-font text-2xl font-black italic">Recent Purchase Logs</h3><p class="text-indigo-200 text-xs font-bold uppercase tracking-widest">Detail of items sold</p></div>
+                                <button @click="window.print()" class="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-full font-black text-xs uppercase transition-all"><i class="fa-solid fa-print mr-2"></i> Export Logs</button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-50 border-b text-[11px] font-black uppercase text-slate-500">
+                                        <tr>
+                                            <th class="px-8 py-5">Date/Time</th>
+                                            <th class="px-8 py-5">Order ID</th>
+                                            <th class="px-8 py-5">Purchased Items</th>
+                                            <th class="px-8 py-5 text-right">Total Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="sale in sales.slice().reverse()" :key="sale.id">
+                                            <tr class="hover:bg-slate-50 transition-colors">
+                                                <td class="px-8 py-6">
+                                                    <p class="text-sm font-bold text-slate-800" x-text="new Date(sale.created_at).toLocaleDateString()"></p>
+                                                    <p class="text-[10px] text-slate-400 font-bold" x-text="new Date(sale.created_at).toLocaleTimeString()"></p>
+                                                </td>
+                                                <td class="px-8 py-6"><span class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-xs font-black" x-text="'ORD-' + sale.id"></span></td>
+                                                <td class="px-8 py-6">
+                                                    <div class="space-y-1">
+                                                        <template x-if="sale.items">
+                                                            <template x-for="item in JSON.parse(sale.items)" :key="item.sku">
+                                                                <div class="text-xs text-slate-600 font-medium">
+                                                                    <span class="font-black text-slate-800" x-text="item.qty + 'x'"></span> 
+                                                                    <span x-text="item.name"></span>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+                                                        <template x-if="!sale.items">
+                                                            <span class="text-xs text-slate-400 italic">Vape Products Bundle</span>
+                                                        </template>
+                                                    </div>
+                                                </td>
+                                                <td class="px-8 py-6 text-right font-black text-slate-900" x-text="'₱' + parseFloat(sale.total_amount).toLocaleString()"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. CATALOG VIEW -->
+                <div x-show="view === 'catalog'" class="h-full p-8 overflow-y-auto bg-slate-50 space-y-8 no-print" x-cloak>
+                    <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <template x-for="p in filteredProducts" :key="p.sku">
+                            <div class="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col">
+                                <div class="flex justify-between items-start mb-4">
+                                    <span class="text-[9px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase" x-text="p.sku"></span>
+                                    <span :class="p.stock > 0 ? 'text-emerald-500' : 'text-red-500'" class="text-[10px] font-black uppercase"><i class="fa-solid fa-circle text-[6px] mr-1"></i> <span x-text="p.stock > 0 ? 'Available' : 'Sold Out'"></span></span>
+                                </div>
+                                <h3 class="text-lg font-black text-slate-800 mb-2 leading-tight h-12 overflow-hidden" x-text="p.name"></h3>
+                                <div class="flex items-end justify-between mt-auto">
+                                    <div><p class="text-[9px] font-black text-slate-400 uppercase">Unit Price</p><p class="text-2xl font-black text-slate-800" x-text="'₱' + p.price"></p></div>
+                                    <div class="text-right"><p class="text-[9px] font-black text-slate-400 uppercase">Quantity</p><p class="text-sm font-black text-slate-800" x-text="p.stock + ' Pcs'"></p></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 5. POS VIEW -->
+                <div x-show="view === 'pos'" class="h-full flex no-print" x-cloak>       
+                    <div class="flex-1 overflow-y-auto p-8">
+                        <div class="max-w-5xl mx-auto space-y-8">
+                            <div class="relative">
+                                <i class="fa-solid fa-search absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input x-model="search" type="text" placeholder="Search product name or code (e.g. FX-3265)..." class="w-full bg-white rounded-full py-6 px-16 shadow-sm text-lg font-semibold outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div class="pos-grid">
+                                <template x-for="p in filteredProducts" :key="p.sku">
+                                    <button @click="addToCart(p)" class="bg-white p-5 rounded-[2rem] border-2 border-transparent hover:border-indigo-500 shadow-sm transition-all text-left flex flex-col h-full">
+                                        <div class="text-[10px] font-black text-indigo-500 uppercase mb-1" x-text="p.sku"></div>
+                                        <div class="font-bold text-sm text-slate-800 mb-4 h-10 overflow-hidden leading-tight flex-1" x-text="p.name"></div>
+                                        <div class="headline-font text-2xl font-black" x-text="'₱' + p.price"></div>
+                                        <div class="mt-2 text-[10px] font-bold text-slate-400" x-text="'Stock: ' + p.stock"></div>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-full lg:w-[400px] bg-white border-l flex flex-col p-8 shadow-2xl">
+                        <h3 class="headline-font text-xl font-black mb-8 border-b border-dashed pb-4">Current Order</h3>
+                        <div class="flex-1 overflow-y-auto space-y-4">
+                            <template x-for="(item, idx) in cart" :key="idx">
+                                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border">
+                                    <div class="flex-1 pr-4">
+                                        <p class="font-bold text-xs uppercase truncate" x-text="item.name"></p>
+                                        <div class="flex items-center gap-2">
+                                            <p class="text-indigo-600 font-black text-xs" x-text="'₱' + (item.price * item.qty).toLocaleString()"></p>
+                                            <button @click="editCartItemPrice(idx)" class="text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-black uppercase hover:bg-amber-600 transition-colors">Price/Disc</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button @click="item.qty > 1 ? item.qty-- : cart.splice(idx, 1)" class="w-6 h-6 bg-white border rounded flex items-center justify-center font-bold">-</button>
+                                        <span class="font-bold text-sm" x-text="item.qty"></span>
+                                        <button @click="item.qty++" class="w-6 h-6 bg-white border rounded flex items-center justify-center font-bold">+</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="pt-8 border-t space-y-4">
+                            <div class="flex justify-between items-end"><span class="text-[10px] font-black text-slate-400 uppercase">Total</span><span class="headline-font text-5xl font-black text-[#1B3041]" x-text="'₱' + cartTotal()"></span></div>
+                            
+                            <!-- CALCULATOR SECTION RESTORED -->
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase block mb-1 ml-4">Cash Received</label>
+                                    <input type="number" x-model.number="cashReceived" placeholder="0.00" class="w-full bg-slate-100 rounded-full py-4 px-6 text-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div class="flex justify-between items-center bg-emerald-50 p-4 rounded-[2rem] border border-emerald-100">
+                                    <span class="text-[10px] font-black text-emerald-600 uppercase">Change Due</span>
+                                    <span class="headline-font text-3xl font-black text-emerald-700" x-text="'₱' + (calculateChange() >= 0 ? calculateChange().toLocaleString(undefined, {minimumFractionDigits:2}) : '0.00')"></span>
+                                </div>
+                            </div>
+
+                            <button @click="checkout()" :disabled="cart.length === 0 || calculateChange() < 0" class="w-full bg-[#1B3041] text-white py-6 rounded-full font-black headline-font text-2xl shadow-xl transition-all disabled:opacity-50">Complete Sale</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. SALES AUDIT VIEW (WITH MONTHLY AUDIT AND LOGO) -->
+                <div x-show="view === 'reports'" class="h-full p-4 md:p-8 overflow-y-auto bg-slate-100/50" x-cloak>
+                    <div class="max-w-5xl mx-auto mb-6 bg-white p-3 rounded-2xl shadow-sm border flex flex-wrap items-center justify-center sm:justify-between gap-4 no-print">
+                        <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                            <button @click="auditType = 'daily'" :class="auditType === 'daily' ? 'bg-[#1B3041] text-white' : 'text-slate-500 hover:text-[#1B3041]'" class="flex-1 sm:flex-none px-6 md:px-8 py-2.5 rounded-lg text-xs md:text-sm font-black transition-all">Daily</button>
+                            <button @click="auditType = 'weekly'" :class="auditType === 'weekly' ? 'bg-[#1B3041] text-white' : 'text-slate-500 hover:text-[#1B3041]'" class="flex-1 sm:flex-none px-6 md:px-8 py-2.5 rounded-lg text-xs md:text-sm font-black transition-all">Weekly</button>
+                            <button @click="auditType = 'monthly'" :class="auditType === 'monthly' ? 'bg-[#1B3041] text-white' : 'text-slate-500 hover:text-[#1B3041]'" class="flex-1 sm:flex-none px-6 md:px-8 py-2.5 rounded-lg text-xs md:text-sm font-black transition-all">Monthly</button>
+                        </div>
+                        <div class="flex gap-3 w-full sm:w-auto">
+                            <button @click="window.print()" class="flex-1 sm:flex-none bg-[#4a5568] text-white px-6 md:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 text-xs shadow-sm transition-all active:scale-95"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                        </div>
+                    </div>
+
+                    <div class="max-w-5xl mx-auto bg-white p-6 md:p-12 rounded-xl shadow-lg border min-h-screen printable-card">
+                        <div class="text-center space-y-2 mb-8 md:mb-10">
+                            <img src="logo.jpg" class="w-24 h-24 mx-auto mb-4 rounded-full border-2 border-slate-100 shadow-sm" alt="Shop Logo">
+                            <h1 class="text-3xl md:text-4xl font-black text-[#1B3041] tracking-tight" x-text="systemName + ' VAPE SHOP'"></h1>
+                            <p class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-[0.2em]" x-text="getBranchName(currentBranchId)"></p>
+                            
+                            <h2 class="text-lg md:text-xl font-bold text-indigo-600 uppercase mt-6 tracking-widest" 
+                                x-text="auditType === 'daily' ? 'Daily Audit Report' : (auditType === 'weekly' ? 'Weekly Audit Report' : 'Monthly Audit Report')"></h2>
+                        </div>
+                        <div class="border-b-2 border-[#1B3041] mb-8 md:mb-10"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-8 md:mb-10">
+                            <div class="bg-indigo-50 border border-indigo-100 p-6 md:p-8 rounded-2xl text-center shadow-sm">
+                                <p class="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Gross Revenue</p>
+                                <h3 class="text-3xl md:text-4xl font-black text-[#1B3041]" x-text="'₱' + calculateRevenue(auditType)"></h3>
+                            </div>
+                            <div class="bg-slate-50 border border-slate-100 p-6 md:p-8 rounded-2xl text-center shadow-sm">
+                                <p class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Sales Volume</p>
+                                <h3 class="text-3xl md:text-4xl font-black text-slate-800" x-text="getSalesCount(auditType) + ' Sales'"></h3>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="text-[10px] md:text-xs font-black text-[#1B3041] uppercase tracking-widest border-l-4 border-indigo-600 pl-3">Stock Movement Summary</h4>
+                            <div class="overflow-x-auto border rounded-xl touch-pan-x">
+                                <table class="w-full text-left min-w-[600px]">
+                                    <thead class="bg-indigo-50 border-b text-[10px] md:text-[11px] font-black uppercase text-[#1B3041]">
+                                        <tr><th class="px-6 py-4">Product & Flavor</th><th class="px-6 py-4 text-center">Open</th><th class="px-6 py-4 text-center">In</th><th class="px-6 py-4 text-center">Out</th><th class="px-6 py-4 text-center">End</th></tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="p in products" :key="p.sku">
+                                            <tr class="text-sm hover:bg-slate-50 transition-colors">
+                                                <td class="px-6 py-4 font-bold text-slate-700 whitespace-nowrap" x-text="p.name"></td>
+                                                <td class="px-6 py-4 text-center text-slate-500 font-bold" x-text="p.stock"></td>
+                                                <td class="px-6 py-4 text-center text-emerald-500 font-black">+0</td>
+                                                <td class="px-6 py-4 text-center text-red-500 font-black">-0</td>
+                                                <td class="px-6 py-4 text-center text-[#1B3041] font-black" x-text="p.stock"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. INVENTORY VIEW -->
+                <div x-show="view === 'inventory'" class="h-full p-10 overflow-y-auto" x-cloak>
+                    <div class="max-w-7xl mx-auto space-y-8">
+                        <div class="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50"><tr class="text-[10px] font-black uppercase text-slate-400"><th class="px-10 py-6">Product</th><th class="text-center">Status</th><th class="text-center">Stock</th><th class="text-right px-10">Action</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="p in products" :key="p.sku">
+                                        <tr><td class="px-10 py-6 font-black" x-text="p.name"></td><td class="text-center"><span :class="p.stock <= 10 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'" class="px-3 py-1 rounded-full text-[9px] font-black uppercase" x-text="p.stock <= 10 ? 'Low' : 'OK'"></span></td><td class="text-center font-black headline-font text-xl" x-text="p.stock"></td><td class="text-right px-10 flex gap-2 justify-end py-6">
+                                            <button @click="editPrice(p)" class="bg-amber-50 text-amber-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase">Price</button>
+                                            <button @click="restock(p)" class="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase">Restock</button>
+                                        </td></tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+function flexUnified() {
+    return {
+        // --- NEW: CONFIGURATION ---
+        // This automatically picks the right URL. 
+        // If the website address is 'localhost', it uses your local server. 
+        // Otherwise, it uses your Render server.
+        apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                    ? 'http://localhost:3000' 
+                    : 'https://flexvapeshop-db.onrender.com',
+
+        systemName: localStorage.getItem('flex_system_name') || 'F.L.E.X',
+        isLoggedIn: localStorage.getItem('flex_logged_in') === 'true',
+        role: localStorage.getItem('flex_role') || 'staff',
+        currentBranchId: parseInt(localStorage.getItem('flex_branch_id')) || 1,
+        view: 'dashboard', auditType: 'daily', search: '', dbOnline: false,
+
+        branches: [
+            { id: 1, name: "POB A ROSARIO" },
+            { id: 2, name: "POB C ROSARIO" },
+            { id: 3, name: "IBAAN" },
+            { id: 4, name: "LIPA CITY" },
+            { id: 5, name: "TAYSAN" }
+        ],
+
+        products: [], sales: [], cart: [], cashReceived: 0,
+        loginUsername: '', loginPassword: '',
+
+        init() { 
+            this.$watch('systemName', val => localStorage.setItem('flex_system_name', val));
+            if(this.isLoggedIn) { this.fetchData(); setInterval(() => this.fetchData(), 60000); } 
+        },
+
+        getGreeting() { const hrs = new Date().getHours(); return hrs < 12 ? "Good Morning" : hrs < 17 ? "Good Afternoon" : "Good Evening"; },
+
+        async fetchData() {
+            try {
+                const pRes = await fetch(`${this.apiBaseUrl}/api/products/${this.currentBranchId}`);
+                this.products = await pRes.json();
+                const sRes = await fetch(`${this.apiBaseUrl}/api/reports/${this.currentBranchId}`);
+                this.sales = await sRes.json();
+                this.dbOnline = true;
+                localStorage.setItem('flex_branch_id', this.currentBranchId);
+            } catch (e) { 
+                this.dbOnline = false; 
+                console.error("Database Connection Failed:", e);
+            }
+        },
+
+        getSalesCount(period) {
+            const today = new Date();
+            return this.sales.filter(s => {
+                const saleDate = new Date(s.created_at);
+                if (period === 'daily' || period === 'day') {
+                    return saleDate.toDateString() === today.toDateString();
+                } else if (period === 'monthly') {
+                    return saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear();
+                } else if (period === 'weekly') {
+                    const diff = today - saleDate;
+                    return diff <= (7 * 24 * 60 * 60 * 1000);
+                }
+                return saleDate.toDateString() === today.toDateString();
+            }).length;
+        },
+
+        calculateRevenue(period) {
+            const today = new Date();
+            let total = 0;
+            this.sales.forEach(s => {
+                const saleDate = new Date(s.created_at);
+                let match = false;
+                if (period === 'daily' || period === 'day') {
+                    if (saleDate.toDateString() === today.toDateString()) match = true;
+                } else if (period === 'monthly') {
+                    if (saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear()) match = true;
+                } else if (period === 'weekly') {
+                    const diff = today - saleDate;
+                    if (diff <= (7 * 24 * 60 * 60 * 1000)) match = true;
+                }
+
+                if(match) total += parseFloat(s.total_amount);
+            });
+            return total.toLocaleString(undefined, {minimumFractionDigits: 2});
+        },
+
+        getLowStockItems() { return this.products.filter(p => p.stock <= 10); },
+        cartTotalRaw() { return this.cart.reduce((s, i) => s + (i.price * i.qty), 0); },
+        cartTotal() { return this.cartTotalRaw().toLocaleString(undefined, {minimumFractionDigits: 2}); },
+        calculateChange() { return this.cashReceived - this.cartTotalRaw(); },
+        addToCart(p) { const exist = this.cart.find(x => x.sku === p.sku); if(exist) exist.qty++; else this.cart.push({...p, qty: 1}); },
+        get filteredProducts() { 
+            const term = this.search.toLowerCase();
+            return this.products.filter(p => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)); 
+        },
+        editCartItemPrice(idx) {
+            const item = this.cart[idx];
+            const newPrice = prompt(`Enter Discounted/New Price for ${item.name}:`, item.price);
+            if (newPrice !== null && !isNaN(newPrice)) this.cart[idx].price = parseFloat(newPrice);
+        },
+        getBranchName(id) { return this.branches.find(b => b.id == id)?.name || "Station"; },
+        logout() { localStorage.clear(); window.location.reload(); },
+
+        async handleLogin() {
+            // Check for Hardcoded Admin Bypass
+            if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
+                this.isLoggedIn = true;
+                this.role = 'owner';
+                localStorage.setItem('flex_logged_in', 'true');
+                localStorage.setItem('flex_role', 'owner');
+                localStorage.setItem('flex_branch_id', this.currentBranchId);
+                this.fetchData();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${this.apiBaseUrl}/api/login`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        username: this.loginUsername, 
+                        password: this.loginPassword, 
+                        branchId: this.currentBranchId 
+                    })
+                });
+                const data = await res.json();
+                if (data.success) { 
+                    this.isLoggedIn = true; 
+                    this.role = 'staff';
+                    localStorage.setItem('flex_logged_in', 'true'); 
+                    localStorage.setItem('flex_role', 'staff'); 
+                    localStorage.setItem('flex_branch_id', this.currentBranchId);
+                    this.fetchData(); 
+                } else alert("Access Denied: Invalid Credentials");
+            } catch (e) { alert("Server connection failed. The server may be waking up, please try again in 30 seconds."); }
+        },
+
+        async checkout() {
+            const res = await fetch(`${this.apiBaseUrl}/api/checkout`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ branchId: this.currentBranchId, cart: this.cart, total: this.cartTotalRaw() })
+            });
+            if (res.ok) { this.cart = []; this.cashReceived = 0; this.fetchData(); alert("✅ SALE SUCCESSFUL"); }
+        },
+
+        async restock(product) {
+            const amount = prompt(`Add stock for ${product.name}:`, "10");
+            if (amount) {
+                await fetch(`${this.apiBaseUrl}/api/restock`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sku: product.sku, branchId: this.currentBranchId, amount: parseInt(amount) })
+                });
+                this.fetchData();
+            }
+        },
+
+        async editPrice(product) {
+            const newPrice = prompt(`Update Master Price for ${product.name}:`, product.price);
+            if (newPrice && !isNaN(newPrice)) {
+                await fetch(`${this.apiBaseUrl}/api/update-price`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sku: product.sku, branchId: this.currentBranchId, price: parseFloat(newPrice) })
+                });
+                this.fetchData();
+            }
+        }
+    }
+}
+</script>
+</body>
+</html>
