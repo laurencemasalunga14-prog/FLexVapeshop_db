@@ -6,12 +6,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- DATABASE CONFIGURATION ---
+// This check tells the code if it's running on Render (production) or your PC.
+const isProduction = process.env.NODE_ENV === "production";
+
 const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'vape_shop_db', 
-    password: '12345678', 
-    port: 5432,
+    // Render provides the DATABASE_URL. If it's missing, it uses your local one.
+    connectionString: process.env.DATABASE_URL || 'postgres://postgres:12345678@localhost:5432/vape_shop_db',
+    // Neon/Render REQUIRE SSL. Your local computer DOES NOT.
+    ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
 pool.connect((err, client, release) => {
@@ -45,14 +48,13 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 2. UPDATE BRANCH CONFIG (The CMS Fix)
+// 2. UPDATE BRANCH CONFIG
 app.post('/api/branches/update', async (req, res) => {
     const { branches } = req.body;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         for (let b of branches) {
-            // Note: "user" is in quotes because it's a reserved word in Postgres
             await client.query(
                 `INSERT INTO branches (id, name, "user", pass) 
                  VALUES ($1, $2, $3, $4) 
@@ -62,11 +64,9 @@ app.post('/api/branches/update', async (req, res) => {
             );
         }
         await client.query('COMMIT');
-        console.log("✅ Database Synced: Branch credentials updated.");
         res.json({ success: true });
     } catch (e) {
         await client.query('ROLLBACK');
-        console.error("❌ DATABASE ERROR:", e.message); // This shows why it failed in your terminal
         res.status(500).json({ success: false, error: e.message });
     } finally {
         client.release();
@@ -119,7 +119,9 @@ app.get('/api/reports/:branchId', async (req, res) => {
     } catch (e) { res.status(500).json([]); }
 });
 
-const PORT = 3000;
+// --- DYNAMIC PORT ---
+// Render will assign a port. Locally it will use 3000.
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
