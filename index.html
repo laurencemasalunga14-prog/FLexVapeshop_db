@@ -1,3 +1,5 @@
+--- START OF FILE Paste June 02, 2026 - 12:14PM ---
+
 <!DOCTYPE html>
 <html lang="en" x-data="flexUnified()">
 <head>
@@ -60,7 +62,14 @@
                     
                     <div class="space-y-3">
                         <input type="text" x-model="loginUsername" placeholder="Username" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none focus:border-indigo-500 transition-all">
-                        <input type="password" x-model="loginPassword" placeholder="Password" @keyup.enter="handleLogin()" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none focus:border-indigo-500 transition-all">
+                        
+                        <!-- UPDATED PASSWORD FIELD WITH SEE PASSWORD TOGGLE -->
+                        <div class="relative">
+                            <input :type="showPassword ? 'text' : 'password'" x-model="loginPassword" placeholder="Password" @keyup.enter="handleLogin()" class="w-full bg-black/40 border-2 border-white/5 rounded-full py-4 px-6 text-white font-bold outline-none focus:border-indigo-500 transition-all">
+                            <button type="button" @click="showPassword = !showPassword" class="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                                <i class="fa-solid" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <button @click="handleLogin()" class="w-full bg-indigo-600 text-white py-5 mt-4 rounded-full headline-font text-xl tracking-widest hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95">
@@ -472,16 +481,20 @@
 <script>
 function flexUnified() {
     return {
-        // --- CONFIGURATION ---
+        // --- NEW: CONFIGURATION ---
+        // This automatically picks the right URL. 
+        // If the website address is 'localhost', it uses your local server. 
+        // Otherwise, it uses your Render server.
         apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
                     ? 'http://localhost:3000' 
-                    : 'https://flexvapeshop-db-1.onrender.com',
+                    : 'https://flexvapeshop-db.onrender.com',
 
         systemName: localStorage.getItem('flex_system_name') || 'F.L.E.X',
         isLoggedIn: localStorage.getItem('flex_logged_in') === 'true',
         role: localStorage.getItem('flex_role') || 'staff',
         currentBranchId: parseInt(localStorage.getItem('flex_branch_id')) || 1,
         view: 'dashboard', auditType: 'daily', search: '', dbOnline: false,
+        showPassword: false, // ADDED FOR PASSWORD TOGGLE
 
         branches: [
             { id: 1, name: "POB A ROSARIO" },
@@ -495,7 +508,6 @@ function flexUnified() {
         loginUsername: '', loginPassword: '',
 
         init() { 
-            console.log("System Initialized. API URL:", this.apiBaseUrl);
             this.$watch('systemName', val => localStorage.setItem('flex_system_name', val));
             if(this.isLoggedIn) { this.fetchData(); setInterval(() => this.fetchData(), 60000); } 
         },
@@ -505,17 +517,14 @@ function flexUnified() {
         async fetchData() {
             try {
                 const pRes = await fetch(`${this.apiBaseUrl}/api/products/${this.currentBranchId}`);
-                if (!pRes.ok) throw new Error("Backend offline");
                 this.products = await pRes.json();
-                
                 const sRes = await fetch(`${this.apiBaseUrl}/api/reports/${this.currentBranchId}`);
                 this.sales = await sRes.json();
-                
                 this.dbOnline = true;
                 localStorage.setItem('flex_branch_id', this.currentBranchId);
             } catch (e) { 
                 this.dbOnline = false; 
-                console.error("Fetch Error:", e);
+                console.error("Database Connection Failed:", e);
             }
         },
 
@@ -523,10 +532,15 @@ function flexUnified() {
             const today = new Date();
             return this.sales.filter(s => {
                 const saleDate = new Date(s.created_at);
-                if (period === 'daily' || period === 'day') return saleDate.toDateString() === today.toDateString();
-                if (period === 'monthly') return saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear();
-                if (period === 'weekly') return (today - saleDate) <= (7 * 24 * 60 * 60 * 1000);
-                return false;
+                if (period === 'daily' || period === 'day') {
+                    return saleDate.toDateString() === today.toDateString();
+                } else if (period === 'monthly') {
+                    return saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear();
+                } else if (period === 'weekly') {
+                    const diff = today - saleDate;
+                    return diff <= (7 * 24 * 60 * 60 * 1000);
+                }
+                return saleDate.toDateString() === today.toDateString();
             }).length;
         },
 
@@ -536,9 +550,15 @@ function flexUnified() {
             this.sales.forEach(s => {
                 const saleDate = new Date(s.created_at);
                 let match = false;
-                if (period === 'daily' || period === 'day') { if (saleDate.toDateString() === today.toDateString()) match = true; }
-                else if (period === 'monthly') { if (saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear()) match = true; }
-                else if (period === 'weekly') { if ((today - saleDate) <= (7 * 24 * 60 * 60 * 1000)) match = true; }
+                if (period === 'daily' || period === 'day') {
+                    if (saleDate.toDateString() === today.toDateString()) match = true;
+                } else if (period === 'monthly') {
+                    if (saleDate.getMonth() === today.getMonth() && saleDate.getFullYear() === today.getFullYear()) match = true;
+                } else if (period === 'weekly') {
+                    const diff = today - saleDate;
+                    if (diff <= (7 * 24 * 60 * 60 * 1000)) match = true;
+                }
+
                 if(match) total += parseFloat(s.total_amount);
             });
             return total.toLocaleString(undefined, {minimumFractionDigits: 2});
@@ -548,60 +568,58 @@ function flexUnified() {
         cartTotalRaw() { return this.cart.reduce((s, i) => s + (i.price * i.qty), 0); },
         cartTotal() { return this.cartTotalRaw().toLocaleString(undefined, {minimumFractionDigits: 2}); },
         calculateChange() { return this.cashReceived - this.cartTotalRaw(); },
-        
-        addToCart(p) { 
-            if(p.stock <= 0) { alert("Out of stock!"); return; }
-            const exist = this.cart.find(x => x.sku === p.sku); 
-            if(exist) exist.qty++; else this.cart.push({...p, qty: 1}); 
-        },
-
-        editCartItemPrice(idx) {
-            const item = this.cart[idx];
-            const newPrice = prompt(`Enter Discounted Price for ${item.name}:`, item.price);
-            if (newPrice !== null && !isNaN(newPrice)) this.cart[idx].price = parseFloat(newPrice);
-        },
-
+        addToCart(p) { const exist = this.cart.find(x => x.sku === p.sku); if(exist) exist.qty++; else this.cart.push({...p, qty: 1}); },
         get filteredProducts() { 
             const term = this.search.toLowerCase();
             return this.products.filter(p => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)); 
         },
-
+        editCartItemPrice(idx) {
+            const item = this.cart[idx];
+            const newPrice = prompt(`Enter Discounted/New Price for ${item.name}:`, item.price);
+            if (newPrice !== null && !isNaN(newPrice)) this.cart[idx].price = parseFloat(newPrice);
+        },
         getBranchName(id) { return this.branches.find(b => b.id == id)?.name || "Station"; },
         logout() { localStorage.clear(); window.location.reload(); },
 
         async handleLogin() {
+            // Check for Hardcoded Admin Bypass
             if (this.loginUsername === 'admin' && this.loginPassword === 'admin123') {
-                this.isLoggedIn = true; this.role = 'owner';
+                this.isLoggedIn = true;
+                this.role = 'owner';
                 localStorage.setItem('flex_logged_in', 'true');
                 localStorage.setItem('flex_role', 'owner');
                 localStorage.setItem('flex_branch_id', this.currentBranchId);
-                this.fetchData(); return;
+                this.fetchData();
+                return;
             }
+
             try {
                 const res = await fetch(`${this.apiBaseUrl}/api/login`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username: this.loginUsername, password: this.loginPassword, branchId: this.currentBranchId })
+                    body: JSON.stringify({ 
+                        username: this.loginUsername, 
+                        password: this.loginPassword, 
+                        branchId: this.currentBranchId 
+                    })
                 });
                 const data = await res.json();
                 if (data.success) { 
-                    this.isLoggedIn = true; this.role = 'staff';
+                    this.isLoggedIn = true; 
+                    this.role = 'staff';
                     localStorage.setItem('flex_logged_in', 'true'); 
                     localStorage.setItem('flex_role', 'staff'); 
                     localStorage.setItem('flex_branch_id', this.currentBranchId);
                     this.fetchData(); 
-                } else alert("Invalid Credentials");
-            } catch (e) { alert("Server starting up. Please try again in 30 seconds."); }
+                } else alert("Access Denied: Invalid Credentials");
+            } catch (e) { alert("Server connection failed. The server may be waking up, please try again in 30 seconds."); }
         },
 
         async checkout() {
-            if(this.cart.length === 0) return;
-            try {
-                const res = await fetch(`${this.apiBaseUrl}/api/checkout`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ branchId: this.currentBranchId, cart: this.cart, total: this.cartTotalRaw() })
-                });
-                if (res.ok) { this.cart = []; this.cashReceived = 0; this.fetchData(); alert("✅ SALE SUCCESSFUL"); }
-            } catch (e) { alert("Error connecting to server."); }
+            const res = await fetch(`${this.apiBaseUrl}/api/checkout`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ branchId: this.currentBranchId, cart: this.cart, total: this.cartTotalRaw() })
+            });
+            if (res.ok) { this.cart = []; this.cashReceived = 0; this.fetchData(); alert("✅ SALE SUCCESSFUL"); }
         },
 
         async restock(product) {
@@ -618,7 +636,6 @@ function flexUnified() {
         async editPrice(product) {
             const newPrice = prompt(`Update Master Price for ${product.name}:`, product.price);
             if (newPrice && !isNaN(newPrice)) {
-                // Note: Ensure your server.js has an /api/update-price route or change this to your route
                 await fetch(`${this.apiBaseUrl}/api/update-price`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ sku: product.sku, branchId: this.currentBranchId, price: parseFloat(newPrice) })
